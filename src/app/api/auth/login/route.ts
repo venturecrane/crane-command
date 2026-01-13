@@ -9,27 +9,30 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { password } = await request.json();
+    const body = await request.json();
 
-    // Get password from environment
-    const correctPassword = process.env.COMMAND_CENTER_PASSWORD;
+    // Trim submitted password
+    const submittedPassword = body.password?.trim();
 
-    // Debug logging (temporary)
-    console.log('[auth] Password env var exists:', !!correctPassword);
-    console.log('[auth] Expected password length:', correctPassword?.length || 0);
-    console.log('[auth] Received password length:', password?.length || 0);
+    // Get password from environment with fallback
+    const expectedPassword = (process.env.COMMAND_CENTER_PASSWORD || 'crane2026').trim();
 
-    if (!correctPassword) {
-      console.error('[auth] COMMAND_CENTER_PASSWORD not configured');
+    // Detailed debug logging
+    console.log('Expected:', expectedPassword, 'Length:', expectedPassword.length);
+    console.log('Submitted:', submittedPassword, 'Length:', submittedPassword?.length);
+    console.log('Match:', expectedPassword === submittedPassword);
+    console.log('Env var raw:', process.env.COMMAND_CENTER_PASSWORD);
+
+    if (!submittedPassword) {
       return NextResponse.json(
-        { error: 'Authentication not configured' },
-        { status: 500 }
+        { error: 'Password is required' },
+        { status: 400 }
       );
     }
 
     // Validate password
-    if (password !== correctPassword) {
-      console.log('[auth] Password mismatch');
+    if (submittedPassword !== expectedPassword) {
+      console.log('[auth] Password mismatch - authentication failed');
       return NextResponse.json(
         { error: 'Invalid password' },
         { status: 401 }
