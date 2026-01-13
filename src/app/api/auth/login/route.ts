@@ -1,8 +1,8 @@
 /**
- * Login API Route for dfg-core
+ * Login API Route for Crane Command Center
  *
  * Simple password-based authentication that sets a cookie.
- * Password is stored in CORE_ACCESS_PASSWORD environment variable.
+ * Password is stored in COMMAND_CENTER_PASSWORD environment variable.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
     const { password } = await request.json();
 
     // Get password from environment
-    const correctPassword = process.env.CORE_ACCESS_PASSWORD;
+    const correctPassword = process.env.COMMAND_CENTER_PASSWORD;
 
     if (!correctPassword) {
-      console.error('[auth] CORE_ACCESS_PASSWORD not configured');
+      console.error('[auth] COMMAND_CENTER_PASSWORD not configured');
       return NextResponse.json(
         { error: 'Authentication not configured' },
         { status: 500 }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     // Set auth cookie
     const response = NextResponse.json({ success: true });
     response.cookies.set({
-      name: 'dfg-core-auth',
+      name: 'crane-command-auth',
       value: 'authenticated',
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

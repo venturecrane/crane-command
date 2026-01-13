@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'DFG Core - Command Center',
-  description: 'Internal development tooling for DFG',
+  title: 'Crane Command Center',
+  description: 'Multi-venture operations for Venture Crane',
 };
 
 export default function RootLayout({
