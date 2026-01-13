@@ -14,6 +14,11 @@ export async function POST(request: NextRequest) {
     // Get password from environment
     const correctPassword = process.env.COMMAND_CENTER_PASSWORD;
 
+    // Debug logging (temporary)
+    console.log('[auth] Password env var exists:', !!correctPassword);
+    console.log('[auth] Expected password length:', correctPassword?.length || 0);
+    console.log('[auth] Received password length:', password?.length || 0);
+
     if (!correctPassword) {
       console.error('[auth] COMMAND_CENTER_PASSWORD not configured');
       return NextResponse.json(
@@ -24,11 +29,14 @@ export async function POST(request: NextRequest) {
 
     // Validate password
     if (password !== correctPassword) {
+      console.log('[auth] Password mismatch');
       return NextResponse.json(
         { error: 'Invalid password' },
         { status: 401 }
       );
     }
+
+    console.log('[auth] Password match - authentication successful');
 
     // Set auth cookie
     const response = NextResponse.json({ success: true });
