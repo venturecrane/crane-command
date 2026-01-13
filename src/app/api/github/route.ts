@@ -1,7 +1,7 @@
 /**
- * GitHub API Proxy Route
+ * GitHub API Proxy Route - Multi-Venture Support
  *
- * Proxies GitHub API requests to keep GITHUB_TOKEN server-side.
+ * Proxies GitHub API requests across multiple ventures.
  * Implements 60s in-memory caching to reduce API calls.
  *
  * Required environment variables:
@@ -14,7 +14,41 @@ import type {
   WorkQueueCard,
   GitHubLabel,
   GitHubQueueResponse,
+  VentureFilter,
+  VentureConfig,
 } from '@/types/github';
+
+// ============================================================================
+// VENTURE CONFIGURATION
+// ============================================================================
+
+const VENTURES: VentureConfig[] = [
+  {
+    id: 'venture-crane',
+    name: 'Venture Crane',
+    owner: 'venturecrane',
+    repo: 'crane-operations',
+    color: '#3b82f6', // blue
+  },
+  {
+    id: 'silicon-crane',
+    name: 'Silicon Crane',
+    owner: 'siliconcrane',
+    repo: 'sc-operations',
+    color: '#8b5cf6', // purple
+  },
+  {
+    id: 'dfg',
+    name: 'Durgan Field Guide',
+    owner: 'durganfieldguide',
+    repo: 'dfg-console',
+    color: '#10b981', // green
+  },
+];
+
+function getVentureById(id: VentureFilter): VentureConfig | undefined {
+  return VENTURES.find((v) => v.id === id);
+}
 
 // ============================================================================
 // CACHE
@@ -40,9 +74,6 @@ function setCache(key: string, data: any): void {
 // GITHUB API
 // ============================================================================
 
-const GITHUB_OWNER = 'durganfieldguide';
-const GITHUB_REPO = 'dfg-console';
-
 interface GitHubSearchResponse {
   total_count: number;
   items: GitHubIssue[];
@@ -58,8 +89,12 @@ interface GitHubIssue {
   pull_request?: { url: string };
 }
 
-function getQueryForQueue(queue: QueueType): string {
-  const base = `repo:${GITHUB_OWNER}/${GITHUB_REPO}+state:open`;
+function getQueryForQueue(
+  queue: QueueType,
+  owner: string,
+  repo: string
+): string {
+  const base = `repo:${owner}/${repo}+state:open`;
 
   switch (queue) {
     case 'needs-qa':
@@ -77,11 +112,12 @@ function getQueryForQueue(queue: QueueType): string {
   }
 }
 
-async function fetchGitHubQueue(
+async function fetchGitHubQueueForVenture(
   queue: QueueType,
+  venture: VentureConfig,
   token: string
 ): Promise<WorkQueueCard[]> {
-  const query = getQueryForQueue(queue);
+  const query = getQueryForQueue(queue, venture.owner, venture.repo);
   // Only encode quotes, leave + and : as-is for GitHub search syntax
   const encodedQuery = query.replace(/"/g, '%22');
   const url = `https://api.github.com/search/issues?q=${encodedQuery}&sort=updated&order=desc&per_page=50`;
@@ -90,14 +126,14 @@ async function fetchGitHubQueue(
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'dfg-app',
+      'User-Agent': 'crane-command',
     },
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     console.error(
-      `[github-api] GitHub API error for queue ${queue}:`,
+      `[github-api] GitHub API error for ${venture.id} queue ${queue}:`,
       response.status,
       errorText
     );
@@ -121,11 +157,46 @@ async function fetchGitHubQueue(
 
   const data: GitHubSearchResponse = await response.json();
 
-  // Normalize issues to WorkQueueCard format
-  return data.items.map((issue) => normalizeGitHubIssue(issue));
+  // Normalize issues to WorkQueueCard format with venture info
+  return data.items.map((issue) =>
+    normalizeGitHubIssue(issue, venture)
+  );
 }
 
-function normalizeGitHubIssue(issue: GitHubIssue): WorkQueueCard {
+async function fetchGitHubQueue(
+  queue: QueueType,
+  token: string
+): Promise<WorkQueueCard[]> {
+  // Fetch from all ventures in parallel
+  const results = await Promise.allSettled(
+    VENTURES.map((venture) =>
+      fetchGitHubQueueForVenture(queue, venture, token)
+    )
+  );
+
+  // Combine successful results
+  const allCards: WorkQueueCard[] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      allCards.push(...result.value);
+    } else {
+      console.error('[github-api] Failed to fetch from a venture:', result.reason);
+    }
+  }
+
+  // Sort by updatedAt descending (most recent first)
+  allCards.sort(
+    (a, b) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  return allCards;
+}
+
+function normalizeGitHubIssue(
+  issue: GitHubIssue,
+  venture: VentureConfig
+): WorkQueueCard {
   const labels: GitHubLabel[] = issue.labels.map((l) => ({
     name: l.name,
     color: l.color,
@@ -152,6 +223,12 @@ function normalizeGitHubIssue(issue: GitHubIssue): WorkQueueCard {
   const hasAgentBrief = extractAgentBrief(body) !== null;
 
   return {
+    // Venture metadata
+    venture: venture.id,
+    ventureOwner: venture.owner,
+    ventureRepo: venture.repo,
+
+    // GitHub data
     type: issue.pull_request ? 'pr' : 'issue',
     number: issue.number,
     title: issue.title,
@@ -160,6 +237,8 @@ function normalizeGitHubIssue(issue: GitHubIssue): WorkQueueCard {
     labels,
     updatedAt: issue.updated_at,
     previewUrl,
+
+    // Derived fields
     statusLabels,
     needsLabels,
     qaGrade,
@@ -267,9 +346,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // Fetch from GitHub API
+  // Fetch from GitHub API (all ventures)
   try {
-    console.log(`[github-api] Fetching queue: ${queue}`);
+    console.log(`[github-api] Fetching queue: ${queue} (all ventures)`);
     const cards = await fetchGitHubQueue(queue, token);
     const fetchedAt = new Date().toISOString();
 

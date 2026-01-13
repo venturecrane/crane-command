@@ -80,10 +80,24 @@ export function WorkQueueCard({ card, queueType, onCopyPrompt }: WorkQueueCardPr
 
       {/* Labels */}
       <div className="flex flex-wrap gap-1.5 mb-2">
+        {/* Venture badge */}
+        <span
+          className={cn(
+            'px-2 py-0.5 rounded text-xs font-medium',
+            card.venture === 'venture-crane'
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+              : card.venture === 'silicon-crane'
+                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          )}
+        >
+          {card.venture === 'venture-crane' ? 'VC' : card.venture === 'silicon-crane' ? 'SC' : 'DFG'}
+        </span>
+
         {card.statusLabels.map((label) => (
           <span
             key={label}
-            className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+            className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
           >
             {label}
           </span>
@@ -111,7 +125,7 @@ export function WorkQueueCard({ card, queueType, onCopyPrompt }: WorkQueueCardPr
           </span>
         )}
         {card.type === 'pr' && (
-          <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+          <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
             PR
           </span>
         )}

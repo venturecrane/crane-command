@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Terminal,
   CheckCircle,
@@ -8,6 +8,7 @@ import {
   Layers,
   GitPullRequest,
   PlayCircle,
+  Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { WorkQueueSection } from '@/components/features/work-queue-section';
@@ -23,13 +24,22 @@ import type {
   WorkQueueCard,
   PromptType,
   QueueType,
+  VentureFilter,
 } from '@/types/github';
+
+const VENTURE_FILTERS: Array<{ id: VentureFilter; label: string }> = [
+  { id: 'all', label: 'All Ventures' },
+  { id: 'venture-crane', label: 'Venture Crane' },
+  { id: 'silicon-crane', label: 'Silicon Crane' },
+  { id: 'dfg', label: 'DFG' },
+];
 
 export default function CommandPage() {
   const [queues, setQueues] = useState<AllQueues | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<Set<QueueType>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [ventureFilter, setVentureFilter] = useState<VentureFilter>('all');
 
   // Initial load
   useEffect(() => {
@@ -92,6 +102,9 @@ export default function CommandPage() {
         labels: card.labels,
         previewUrl: card.previewUrl,
         type: card.type,
+        venture: card.venture,
+        ventureOwner: card.ventureOwner,
+        ventureRepo: card.ventureRepo,
       };
 
       let prompt: string | null = null;
@@ -121,6 +134,19 @@ export default function CommandPage() {
     []
   );
 
+  // Filter queues based on selected venture
+  const filteredQueues = useMemo(() => {
+    if (!queues || ventureFilter === 'all') return queues;
+
+    return {
+      needsQa: queues.needsQa.filter((card) => card.venture === ventureFilter),
+      needsPm: queues.needsPm.filter((card) => card.venture === ventureFilter),
+      devQueue: queues.devQueue.filter((card) => card.venture === ventureFilter),
+      readyToMerge: queues.readyToMerge.filter((card) => card.venture === ventureFilter),
+      inFlight: queues.inFlight.filter((card) => card.venture === ventureFilter),
+    };
+  }, [queues, ventureFilter]);
+
   return (
     <div className="min-h-screen w-full bg-gray-50 dark:bg-gray-900">
       <main className="container mx-auto max-w-7xl">
@@ -132,21 +158,40 @@ export default function CommandPage() {
               <Terminal className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  DFG Command Center
+                  Crane Command Center
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Internal Development Tooling
+                  Multi-Venture Operations
                 </p>
               </div>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => loadAllQueues()}
-              disabled={loading}
-            >
-              Refresh All
-            </Button>
+
+            <div className="flex items-center gap-2">
+              {/* Venture Filter */}
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select
+                  value={ventureFilter}
+                  onChange={(e) => setVentureFilter(e.target.value as VentureFilter)}
+                  className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                >
+                  {VENTURE_FILTERS.map((filter) => (
+                    <option key={filter.id} value={filter.id}>
+                      {filter.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => loadAllQueues()}
+                disabled={loading}
+              >
+                Refresh All
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -176,13 +221,13 @@ export default function CommandPage() {
             </div>
           )}
 
-          {queues && (
+          {filteredQueues && (
             <>
               <WorkQueueSection
                 title="Needs QA"
                 queueType="needs-qa"
                 icon={CheckCircle}
-                cards={queues.needsQa}
+                cards={filteredQueues.needsQa}
                 loading={refreshing.has('needs-qa')}
                 onRefresh={() => handleRefreshQueue('needs-qa', 'needsQa')}
                 onCopyPrompt={handleCopyPrompt}
@@ -192,7 +237,7 @@ export default function CommandPage() {
                 title="Needs PM"
                 queueType="needs-pm"
                 icon={AlertCircle}
-                cards={queues.needsPm}
+                cards={filteredQueues.needsPm}
                 loading={refreshing.has('needs-pm')}
                 onRefresh={() => handleRefreshQueue('needs-pm', 'needsPm')}
                 onCopyPrompt={handleCopyPrompt}
@@ -202,7 +247,7 @@ export default function CommandPage() {
                 title="Dev Queue"
                 queueType="dev-queue"
                 icon={Layers}
-                cards={queues.devQueue}
+                cards={filteredQueues.devQueue}
                 loading={refreshing.has('dev-queue')}
                 onRefresh={() => handleRefreshQueue('dev-queue', 'devQueue')}
                 onCopyPrompt={handleCopyPrompt}
@@ -212,7 +257,7 @@ export default function CommandPage() {
                 title="Ready to Merge"
                 queueType="ready-to-merge"
                 icon={GitPullRequest}
-                cards={queues.readyToMerge}
+                cards={filteredQueues.readyToMerge}
                 loading={refreshing.has('ready-to-merge')}
                 onRefresh={() =>
                   handleRefreshQueue('ready-to-merge', 'readyToMerge')
@@ -224,7 +269,7 @@ export default function CommandPage() {
                 title="In Flight"
                 queueType="in-flight"
                 icon={PlayCircle}
-                cards={queues.inFlight}
+                cards={filteredQueues.inFlight}
                 loading={refreshing.has('in-flight')}
                 onRefresh={() => handleRefreshQueue('in-flight', 'inFlight')}
                 onCopyPrompt={handleCopyPrompt}

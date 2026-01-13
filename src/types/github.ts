@@ -1,8 +1,7 @@
 /**
- * GitHub Integration Types for Command Center
+ * GitHub Integration Types for Crane Command Center
  *
- * These types support Phase 1 (read-only queues + copy prompts)
- * and include placeholders for Phase 2 (orchestrator integration).
+ * Multi-venture support for Venture Crane operations.
  */
 
 export type QueueType =
@@ -18,6 +17,16 @@ export type PromptType =
   | 'agent-brief'
   | 'merge';
 
+export type VentureFilter = 'all' | 'venture-crane' | 'silicon-crane' | 'dfg';
+
+export interface VentureConfig {
+  id: VentureFilter;
+  name: string;
+  owner: string;
+  repo: string;
+  color: string;
+}
+
 export interface GitHubLabel {
   name: string;
   color: string;
@@ -25,7 +34,12 @@ export interface GitHubLabel {
 }
 
 export interface WorkQueueCard {
-  // Phase 1 - GitHub data
+  // Multi-venture metadata
+  venture: VentureFilter;
+  ventureOwner: string;
+  ventureRepo: string;
+
+  // GitHub data
   type: 'issue' | 'pr';
   number: number;
   title: string;
@@ -35,19 +49,19 @@ export interface WorkQueueCard {
   updatedAt: string;
   previewUrl?: string;
 
-  // Phase 1 - Derived fields
+  // Derived fields
   statusLabels: string[];
   needsLabels: string[];
   qaGrade?: string;
   hasAgentBrief: boolean;
 
-  // Phase 2 - Orchestrator metadata (placeholders)
+  // Orchestrator metadata (future)
   lastEventType?: string;
   lastEventTimestamp?: string;
   overallVerdict?: 'PASS' | 'FAIL' | 'BLOCKED';
   provenanceVerified?: boolean;
 
-  // Phase 2 - Provider settings (placeholders)
+  // Provider settings (future)
   qaProvider?: 'anthropic' | 'openai';
   qaModel?: string;
   qaTemperature?: number;
@@ -69,6 +83,9 @@ export interface PromptContext {
   labels: GitHubLabel[];
   previewUrl?: string;
   type: 'issue' | 'pr';
+  venture: VentureFilter;
+  ventureOwner: string;
+  ventureRepo: string;
 }
 
 export interface GitHubQueueResponse {
